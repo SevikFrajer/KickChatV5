@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kick Chat">
+<meta name="theme-color" content="#08080e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Kick Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08080e;--surface:#0f0f18;--s2:#161624;--border:#1e1e30;
+  --kick:#53fc18;--kdim:#1a4a07;--kglow:rgba(83,252,24,.15);
+  --text:#e2e2f0;--muted:#4a4a6a;--accent:#a855f7;
+  --danger:#ff4d6d;--warn:#fbbf24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;height:100dvh;display:flex;flex-direction:column}
+
+/* ── HEADER ── */
+.hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:30}
+.hdr-l{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s,box-shadow .3s}
+.dot.live{background:var(--kick);box-shadow:0 0 8px var(--kick)}
+.dot.err{background:var(--danger)}
+.dot.spin{background:var(--warn);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ch-name{font-size:15px;font-weight:800;color:var(--kick);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;cursor:pointer;user-select:none}
+.st-txt{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;white-space:nowrap}
+.hdr-r{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.ibtn{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;transition:border-color .2s,color .2s,background .2s;user-select:none}
+.ibtn:hover,.ibtn.on{border-color:var(--kick);color:var(--kick)}
+.ibtn.li{border-color:var(--kick);color:var(--kick);background:var(--kdim)}
+
+/* ── SEARCH PANEL ── */
+.spanel{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;flex-shrink:0;display:none;z-index:25}
+.spanel.open{display:block}
+.srow{display:flex;gap:8px}
+.sinput{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;padding:8px 12px;outline:none;transition:border-color .2s}
+.sinput:focus{border-color:var(--kick)}
+.sinput::placeholder{color:var(--muted)}
+.sgo{background:var(--kdim);border:1px solid var(--kick);border-radius:8px;color:var(--kick);font-family:'Space Mono',monospace;font-size:12px;padding:8px 14px;cursor:pointer}
+.sres{margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:170px;overflow-y:auto}
+.sri{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--s2);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .2s}
+.sri:hover{border-color:var(--kick)}
+.sri img.av{width:30px;height:30px;border-radius:50%;object-fit:cover;background:var(--border);flex-shrink:0}
+.sri-i{flex:1;min-width:0}
+.sri-n{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sri-s{font-size:10px;font-family:'Space Mono',monospace}
+.clive{color:var(--kick)}.coff{color:var(--muted)}
+
+/* ── VIDEO PANEL ── */
+.vpanel{background:#000;flex-shrink:0;overflow:hidden;transition:height .3s ease;height:0;position:relative}
+.vpanel.open{height:calc(56.25vw)}/* 16:9 */
+.vpanel iframe{width:100%;height:100%;border:none;display:block}
+.vtoggle{position:absolute;top:6px;right:8px;z-index:5;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:11px;padding:4px 8px;cursor:pointer;font-family:'Space Mono',monospace;backdrop-filter:blur(4px)}
+.vlive-badge{position:absolute;top:6px;left:8px;z-index:5;background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:5px;font-family:'Space Mono',monospace;letter-spacing:.5px}
+
+/* ── CHAT ── */
+#chat{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+#chat::-webkit-scrollbar{width:3px}
+#chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.msg{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px;padding:4px 8px;border-radius:7px;line-height:1.6;word-break:break-word;animation:fu .15s ease}
+.msg:hover{background:rgba(255,255,255,.025)}
+@keyframes fu{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.msg-badges{display:flex;align-items:center;gap:2px;flex-shrink:0;align-self:center}
+.msg-badges img{width:16px;height:16px;vertical-align:middle;border-radius:2px}
+.mu{font-weight:700;font-size:13px;white-space:nowrap;flex-shrink:0;cursor:default}
+.mc{font-size:13px;color:var(--text);font-family:'Space Mono',monospace;flex:1;min-width:0}
+.mc img.emote{height:22px;width:auto;vertical-align:middle;margin:0 1px}
+.msg.sys{justify-content:center;font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;background:transparent!important;flex-wrap:nowrap}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:76px;right:14px;background:var(--kick);color:#000;border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 14px rgba(83,252,24,.5);z-index:10}
+
+/* ── INPUT BAR ── */
+.ibar{border-top:1px solid var(--border);background:var(--surface);padding:8px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:5px}
+.irow{display:flex;gap:8px;align-items:flex-end}
+.itxt{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;padding:9px 12px;outline:none;resize:none;max-height:90px;line-height:1.4;transition:border-color .2s;overflow-y:auto}
+.itxt:focus{border-color:var(--kick)}
+.itxt::placeholder{color:var(--muted)}
+.itxt:disabled{opacity:.4;cursor:not-allowed}
+.sbtn{background:var(--kdim);border:1px solid var(--kick);border-radius:10px;color:var(--kick);width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
+.sbtn:hover{background:var(--kglow)}
+.sbtn:disabled{opacity:.35;cursor:not-allowed}
+.imeta{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-family:'Space Mono',monospace;color:var(--muted)}
+.lhint{color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.cc.w{color:var(--warn)}
+
+/* ── EMOTE PICKER ── */
+.epicker{position:absolute;bottom:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-bottom:none;border-radius:12px 12px 0 0;padding:10px;display:none;flex-direction:column;gap:8px;max-height:260px;z-index:40;box-shadow:0 -4px 20px rgba(0,0,0,.5)}
+.epicker.open{display:flex}
+.epicker-tabs{display:flex;gap:6px;flex-shrink:0}
+.etab{background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'Space Mono',monospace;font-size:10px;padding:5px 10px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.etab.on{border-color:var(--kick);color:var(--kick);background:var(--kdim)}
+.epicker-search{background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Space Mono',monospace;font-size:12px;padding:6px 10px;outline:none;width:100%;flex-shrink:0;transition:border-color .2s}
+.epicker-search:focus{border-color:var(--kick)}
+.epicker-search::placeholder{color:var(--muted)}
+.egrid{display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;padding:2px}
+.egrid::-webkit-scrollbar{width:3px}
+.egrid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.etile{background:var(--s2);border:1px solid transparent;border-radius:6px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:border-color .15s,background .15s;width:52px;flex-shrink:0}
+.etile:hover{border-color:var(--kick);background:var(--kdim)}
+.etile img{width:32px;height:32px;object-fit:contain}
+.etile span{font-size:8px;color:var(--muted);font-family:'Space Mono',monospace;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.epicker-empty{color:var(--muted);font-size:12px;font-family:'Space Mono',monospace;text-align:center;padding:20px}
+
+/* ── WATERMARK ── */
+.watermark{text-align:center;font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;padding:2px 0 1px;letter-spacing:.3px;flex-shrink:0;opacity:.5}
+.watermark span{color:var(--kick);opacity:.7}
+
+/* ── FOLLOWING PANEL ── */
+.fpanel{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;flex-shrink:0;display:none;max-height:260px;overflow-y:auto}
+.fpanel.open{display:block}
+.fpanel::-webkit-scrollbar{width:3px}
+.fpanel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.fpanel-title{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.fpanel-list{display:flex;flex-direction:column;gap:4px}
+.fitem{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--s2);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .2s}
+.fitem:hover{border-color:var(--kick)}
+.fitem img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:var(--border);flex-shrink:0}
+.fitem-info{flex:1;min-width:0}
+.fitem-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fitem-sub{font-size:10px;font-family:'Space Mono',monospace}
+.fitem-live{color:var(--kick)}.fitem-off{color:var(--muted)}
+.fitem-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.fitem-dot.live{background:var(--kick);box-shadow:0 0 5px var(--kick)}
+.fpanel-msg{font-size:12px;color:var(--muted);font-family:'Space Mono',monospace;text-align:center;padding:16px 0}
+
+/* ── LOGIN MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 20px;width:100%;max-width:360px;max-height:90dvh;overflow-y:auto}
+.mtitle{font-size:17px;font-weight:800;color:var(--kick);margin-bottom:5px}
+.msub{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:14px;line-height:1.6}
+.mfield{margin-bottom:11px}
+.mlabel{display:block;font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.minput{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;padding:9px 12px;outline:none;transition:border-color .2s}
+.minput:focus{border-color:var(--kick)}
+.minput::placeholder{color:var(--muted)}
+.mnote{font-size:11px;color:var(--warn);font-family:'Space Mono',monospace;margin-bottom:14px;line-height:1.55;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:9px 10px}
+.macts{display:flex;gap:8px;margin-top:4px}
+.bpri{flex:1;background:var(--kdim);border:1px solid var(--kick);border-radius:8px;color:var(--kick);font-family:'Space Mono',monospace;font-size:13px;padding:10px;cursor:pointer;font-weight:700}
+.bpri:hover{background:var(--kglow)}
+.bsec{background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Space Mono',monospace;font-size:13px;padding:10px 14px;cursor:pointer}
+.bsec:hover{border-color:var(--text);color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="dot" id="dot"></div>
+    <div class="ch-name" id="chName" onclick="toggleSearch()">Trizz_07</div>
+    <div class="st-txt" id="stTxt">načítám…</div>
+  </div>
+  <div class="hdr-r">
+    <button class="ibtn" id="followBtn" onclick="toggleFollowing()" title="Sledovaní">❤️</button>
+    <button class="ibtn" id="videoBtn" onclick="toggleVideo()" title="Video">📺</button>
+    <button class="ibtn" id="searchBtn" onclick="toggleSearch()" title="Hledat">🔍</button>
+    <button class="ibtn" id="loginBtn" onclick="toggleLogin()" title="Přihlásit">👤</button>
+  </div>
+</div>
+
+<!-- FOLLOWING -->
+<div class="fpanel" id="fpanel">
+  <div class="fpanel-title">Sledovaní streameři</div>
+  <div class="fpanel-list" id="flist">
+    <div class="fpanel-msg">Načítám…</div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div class="spanel" id="spanel">
+  <div class="srow">
+    <input class="sinput" id="sinput" placeholder="Hledat kanál…" onkeydown="if(event.key==='Enter')doSearch()">
+    <button class="sgo" onclick="doSearch()">Hledat</button>
+  </div>
+  <div class="sres" id="sres"></div>
+</div>
+
+<!-- VIDEO -->
+<div class="vpanel" id="vpanel">
+  <span class="vlive-badge" id="vlivebadge" style="display:none">🔴 ŽIVĚ</span>
+  <button class="vtoggle" onclick="toggleVideo()">✕ Zavřít</button>
+  <iframe id="vframe" src="" allowfullscreen allow="autoplay; fullscreen"></iframe>
+</div>
+
+<!-- CHAT -->
+<div id="chat"></div>
+<button class="fab" id="fab" onclick="scrollBot()">↓</button>
+
+<!-- INPUT -->
+<div class="ibar" style="position:relative">
+  <!-- EMOTE PICKER -->
+  <div class="epicker" id="epicker">
+    <div class="epicker-tabs" id="etabs">
+      <button class="etab on" data-tab="7tv" onclick="switchTab('7tv')">7TV</button>
+      <button class="etab" data-tab="kick" onclick="switchTab('kick')">Kick</button>
+    </div>
+    <input class="epicker-search" id="esearch" placeholder="Hledat emote…" oninput="filterEmotes()">
+    <div class="egrid" id="egrid"></div>
+  </div>
+  <div class="irow">
+    <button class="ibtn" id="emoteBtn" onclick="toggleEmotePicker()" title="Emoty" style="flex-shrink:0;border-radius:10px">😀</button>
+    <textarea class="itxt" id="itxt" placeholder="Napsat zprávu…" rows="1"
+      oninput="onIC()" onkeydown="onIK(event)" disabled></textarea>
+    <button class="sbtn" id="sbtn" onclick="sendMsg()" disabled>➤</button>
+  </div>
+  <div class="imeta">
+    <span id="lhintEl"><span class="lhint" onclick="toggleLogin()">Přihlásit se</span> pro psaní</span>
+    <span class="cc" id="cc">0 / 500</span>
+  </div>
+  <div class="watermark">developed by <a href="https://instagram.com/yg_sipik" target="_blank" rel="noopener" style="color:var(--kick);text-decoration:none;opacity:.7">yg_sipik</a></div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="overlay" id="loginModal" onclick="if(event.target===this)closeLogin()">
+  <div class="modal">
+    <div class="mtitle">Přihlásit se</div>
+    <div class="msub">Zadej Bearer token a přezdívku. Uloží se lokálně v prohlížeči.</div>
+    <div class="mfield">
+      <label class="mlabel">Kick Bearer Token</label>
+      <input class="minput" type="password" id="tinput" placeholder="eyJ… nebo Bearer eyJ…">
+    </div>
+    <div class="mfield">
+      <label class="mlabel">Tvoje přezdívka</label>
+      <input class="minput" type="text" id="uninput" placeholder="TvůjNick">
+    </div>
+    <div class="mnote">
+      📋 Jak získat token (PC):<br>
+      1. Přihlas se na kick.com<br>
+      2. F12 → záložka Network → obnov stránku<br>
+      3. Klikni na libovolný kick.com API request<br>
+      4. Headers → zkopíruj hodnotu <b>Authorization</b>
+    </div>
+    <div class="macts">
+      <button class="bsec" onclick="closeLogin()">Zrušit</button>
+      <button class="bpri" onclick="doLogin()">Přihlásit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// PROXY HELPER
+// ════════════════════════════════════════════
+const PROXIES = [
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+async function pfetch(url, opts={}) {
+  try {
+    const r = await fetch(url, {...opts, signal: AbortSignal.timeout(4000)});
+    if (r.ok) return r;
+  } catch(e){}
+  for (const px of PROXIES) {
+    try {
+      const r = await fetch(px(url), {...opts, signal: AbortSignal.timeout(6000)});
+      if (r.ok) return r;
+    } catch(e){}
+  }
+  return null;
+}
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let channel   = 'trizz_07';
+let chatroomId = null;
+let isLive     = false;
+let ws         = null;
+let reconnT    = null;
+let autoScroll = true;
+let emotes7tv  = {};
+let subBadgeUrl = null; // URL badge pro sub
+let authToken  = localStorage.getItem('k_tok') || '';
+let myUser     = localStorage.getItem('k_usr') || '';
+let loggedIn   = !!(authToken && myUser);
+let videoOpen  = false;
+let connecting = false;
+
+// DOM
+const chatEl   = document.getElementById('chat');
+const dot      = document.getElementById('dot');
+const stTxt    = document.getElementById('stTxt');
+const chName   = document.getElementById('chName');
+const loginBtn = document.getElementById('loginBtn');
+const videoBtn = document.getElementById('videoBtn');
+const itxt     = document.getElementById('itxt');
+const sbtn     = document.getElementById('sbtn');
+const fab      = document.getElementById('fab');
+const ccEl     = document.getElementById('cc');
+const lhintEl  = document.getElementById('lhintEl');
+const vpanel   = document.getElementById('vpanel');
+const vframe   = document.getElementById('vframe');
+const vbadge   = document.getElementById('vlivebadge');
+
+// ════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════
+const PAL=['#53fc18','#a855f7','#38bdf8','#fb923c','#f472b6','#34d399','#facc15','#60a5fa','#e879f9','#f87171','#2dd4bf','#c084fc'];
+const _cc={};
+function col(n){if(_cc[n])return _cc[n];let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0x7fffffff;return(_cc[n]=PAL[h%PAL.length])}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// ════════════════════════════════════════════
+// BADGE RENDERING
+// ════════════════════════════════════════════
+// Kick sends badges as: [{type:"subscriber",text:"Subscriber",count:3}, ...]
+// or [{type:"moderator"}, {type:"broadcaster"}] etc.
+const BADGE_ICONS = {
+  broadcaster: '👑',
+  moderator:   '🔧',
+  vip:         '💎',
+  og:          '⭐',
+  verified:    '✅',
+};
+
+// Kick subscriber badge images are at this CDN pattern
+function subBadgeImgUrl(channelId, months) {
+  // Try channel-specific badge first, fallback to generic kick sub badge
+  return subBadgeUrl || `https://files.kick.com/channel_subscription_badges/${channelId || 0}/1`;
+}
+
+function renderBadges(badges) {
+  if (!badges || !badges.length) return '';
+  let html = '';
+  for (const b of badges) {
+    const type = (b.type || '').toLowerCase();
+
+    if (type === 'subscriber' || type === 'sub') {
+      // Use stored sub badge URL from channel data, or fallback icon
+      const imgSrc = subBadgeUrl || null;
+      if (imgSrc) {
+        html += `<img src="${esc(imgSrc)}" title="Subscriber${b.count ? ' ('+b.count+'m)' : ''}" alt="sub" onerror="this.outerHTML='<span title=&quot;Sub&quot; style=&quot;font-size:12px&quot;>💚</span>'">`;
+      } else {
+        html += `<span title="Subscriber${b.count?' ('+b.count+'m)':''}" style="font-size:12px;line-height:1">💚</span>`;
+      }
+      continue;
+    }
+
+    if (BADGE_ICONS[type]) {
+      html += `<span title="${esc(b.text||type)}" style="font-size:12px;line-height:1">${BADGE_ICONS[type]}</span>`;
+      continue;
+    }
+
+    // Badge with explicit image URL
+    if (b.image_url || b.url) {
+      html += `<img src="${esc(b.image_url||b.url)}" title="${esc(b.text||type)}" alt="${esc(type)}" onerror="this.style.display='none'">`;
+    }
+  }
+  return html;
+}
+
+// ════════════════════════════════════════════
+// CHAT DOM
+// ════════════════════════════════════════════
+function addMsg(user, text, color, badges, msgEmotes, own) {
+  const d = document.createElement('div');
+  d.className = 'msg' + (own ? ' own' : '');
+
+  // Badges
+  const badgeHtml = renderBadges(badges);
+  if (badgeHtml) {
+    const bdiv = document.createElement('span');
+    bdiv.className = 'msg-badges';
+    bdiv.innerHTML = badgeHtml;
+    d.appendChild(bdiv);
+  }
+
+  const u = document.createElement('span');
+  u.className = 'mu';
+  u.style.color = color || col(user);
+  u.textContent = user + ':';
+
+  const c = document.createElement('span');
+  c.className = 'mc';
+  c.innerHTML = parseText(text, msgEmotes);
+
+  d.appendChild(u);
+  d.appendChild(c);
+  chatEl.appendChild(d);
+  if (autoScroll) scrollBot();
+  trimChat();
+}
+
+function addSys(t) {
+  const d = document.createElement('div');
+  d.className = 'msg sys'; d.textContent = t;
+  chatEl.appendChild(d);
+  if (autoScroll) scrollBot();
+}
+
+function trimChat() { while (chatEl.children.length > 400) chatEl.removeChild(chatEl.firstChild) }
+function scrollBot() { chatEl.scrollTop = chatEl.scrollHeight; fab.style.display = 'none'; autoScroll = true; }
+
+chatEl.addEventListener('scroll', () => {
+  const bot = chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 80;
+  if (bot) { autoScroll = true; fab.style.display = 'none'; }
+  else if (autoScroll) { autoScroll = false; fab.style.display = 'flex'; }
+});
+
+// ════════════════════════════════════════════
+// EMOTE PARSING
+// ════════════════════════════════════════════
+// Kick native emote CDN
+function kickEmoteUrl(id) {
+  return `https://files.kick.com/emotes/${id}/fullsize`;
+}
+
+function parseText(text, msgEmotes) {
+  if (!text) return '';
+
+  // Build a lookup map from the message's own emote list (id -> name, url)
+  const kickEmoteMap = {};
+  if (msgEmotes) {
+    for (const e of msgEmotes) {
+      if (e.id) kickEmoteMap[String(e.id)] = e;
+    }
+  }
+
+  // Replace Kick inline format: [emote:ID:NAME]
+  // Also handles older format without brackets
+  let html = esc(text);
+
+  // Format: [emote:12345:EmoteName]
+  html = html.replace(/\[emote:(\d+):([^\]]+)\]/g, (_, id, name) => {
+    // Check 7TV by name first
+    if (emotes7tv[name]) return `<img class="emote" src="${emotes7tv[name]}" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
+    // Use Kick CDN
+    return `<img class="emote" src="${kickEmoteUrl(id)}" alt="${esc(name)}" title="${esc(name)}" loading="lazy" onerror="this.style.display='none'">`;
+  });
+
+  // Now handle remaining words for 7TV emotes (text not inside already-replaced tags)
+  // We do a word-by-word pass on text portions only
+  html = html.replace(/(?<!<[^>]*)(?:^| )([^ <]+)(?= |$)/g, (match, word) => {
+    if (emotes7tv[word]) {
+      return match.replace(word, `<img class="emote" src="${emotes7tv[word]}" alt="${esc(word)}" title="${esc(word)}" loading="lazy">`);
+    }
+    return match;
+  });
+
+  return html;
+}
+
+// ════════════════════════════════════════════
+// 7TV EMOTES
+// ════════════════════════════════════════════
+async function load7TV(kickUserId) {
+  emotes7tv = {};
+  let cnt = 0;
+  // Global — 7TV má otevřené CORS
+  try {
+    const r = await fetch('https://7tv.io/v3/emote-sets/global');
+    if (r.ok) {
+      const d = await r.json();
+      for (const e of (d.emotes||[])) { emotes7tv[e.name] = `https://cdn.7tv.app/emote/${e.id}/1x.webp`; cnt++; }
+    }
+  } catch(e){}
+  // Channel specific
+  if (kickUserId) {
+    try {
+      const r = await fetch(`https://7tv.io/v3/users/kick/${kickUserId}`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const e of (d.emote_set?.emotes||[])) { emotes7tv[e.name] = `https://cdn.7tv.app/emote/${e.id}/1x.webp`; cnt++; }
+      }
+    } catch(e){}
+  }
+  addSys(`🎭 7TV: ${cnt > 0 ? cnt+' emotů načteno' : 'nedostupné'}`);
+}
+
+// ════════════════════════════════════════════
+// KICK API
+// ════════════════════════════════════════════
+async function fetchChannel(slug) {
+  for (const url of [`https://kick.com/api/v2/channels/${slug}`, `https://kick.com/api/v1/channels/${slug}`]) {
+    try {
+      const r = await pfetch(url);
+      if (r) { const d = await r.json(); if (d && (d.chatroom || d.id)) return d; }
+    } catch(e){}
+  }
+  return null;
+}
+
+async function searchKick(q) {
+  try {
+    const r = await pfetch(`https://kick.com/api/v1/search?query=${encodeURIComponent(q)}&limit=8`);
+    if (!r) return [];
+    const d = await r.json();
+    return d.channels || d.data?.channels || [];
+  } catch(e){ return []; }
+}
+
+// ════════════════════════════════════════════
+// VIDEO PLAYER
+// ════════════════════════════════════════════
+function toggleVideo() {
+  videoOpen = !videoOpen;
+  if (videoOpen) {
+    vframe.src = `https://player.kick.com/${channel}?autoplay=true&muted=false`;
+    vpanel.classList.add('open');
+    vbadge.style.display = isLive ? 'block' : 'none';
+    videoBtn.classList.add('on');
+  } else {
+    vpanel.classList.remove('open');
+    // Delay clearing src to allow animation
+    setTimeout(() => { vframe.src = ''; }, 300);
+    videoBtn.classList.remove('on');
+  }
+}
+
+// ════════════════════════════════════════════
+// WEBSOCKET
+// ════════════════════════════════════════════
+async function connect(slug) {
+  if (connecting) return;
+  slug = (slug || channel).toLowerCase().trim();
+  if (!slug) return;
+  connecting = true;
+  channel = slug;
+  chatroomId = null;
+  subBadgeUrl = null;
+
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  clearTimeout(reconnT);
+
+  // Close video if switching channels
+  if (videoOpen) {
+    vpanel.classList.remove('open');
+    setTimeout(() => { vframe.src = ''; }, 300);
+    videoOpen = false;
+    videoBtn.classList.remove('on');
+  }
+
+  chName.textContent = slug;
+  document.title = slug + ' – Kick Chat';
+  dot.className = 'dot spin'; stTxt.textContent = 'načítám…';
+  chatEl.innerHTML = '';
+  addSys(`📡 Připojuji → ${slug}…`);
+
+  const data = await fetchChannel(slug);
+  connecting = false;
+
+  if (!data) {
+    dot.className = 'dot err'; stTxt.textContent = 'nenalezen';
+    addSys('❌ Kanál nenalezen nebo API nedostupné.');
+    reconnT = setTimeout(() => connect(channel), 15000);
+    return;
+  }
+
+  chatroomId = data.chatroom?.id || data.chatroom_id;
+  const kickUserId = data.user?.id || data.user_id || data.id;
+  isLive = !!(data.livestream || data.is_live);
+  storeKickEmotes(data);
+
+  // Extract sub badge URL — Kick nests it in badge_image.src
+  const subBadges = data.chatroom?.subscription_badges || data.subscription_badges || data.channel_subscription_badges || [];
+  if (subBadges.length > 0) {
+    const _sb = subBadges[0];
+    subBadgeUrl = _sb?.badge_image?.src || (_sb?.badge_image?.srcset||"").split(" ")[0] || _sb?.image_url || _sb?.url || null;
+  }
+
+  if (!chatroomId) {
+    dot.className = 'dot err';
+    addSys('❌ Nepodařilo se získat chatroom ID.');
+    reconnT = setTimeout(() => connect(channel), 15000);
+    return;
+  }
+
+  // Update video button hint
+  if (isLive) {
+    videoBtn.title = `Video (živě)`;
+    videoBtn.style.borderColor = 'var(--danger)';
+    videoBtn.style.color = 'var(--danger)';
+    addSys(`🔴 ${slug} je živě! Stiskni 📺 pro video.`);
+  } else {
+    videoBtn.title = 'Video (offline)';
+    videoBtn.style.borderColor = '';
+    videoBtn.style.color = '';
+  }
+
+  await load7TV(kickUserId);
+  openWS();
+}
+
+function openWS() {
+  const KEY = '32cbd69e4b950bf97679';
+  ws = new WebSocket(`wss://ws-us2.pusher.com/app/${KEY}?protocol=7&client=js&version=7.6.0&flash=false`);
+
+  ws.onopen = () => {
+    dot.className = 'dot live'; stTxt.textContent = 'živě';
+    addSys(`✅ Chat připojen`);
+    ws.send(JSON.stringify({event:'pusher:subscribe', data:{channel:`chatrooms.${chatroomId}.v2`, auth:''}}));
+    ws._ping = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({event:'pusher:ping',data:{}})); }, 25000);
+  };
+
+  ws.onmessage = e => { try { handleWS(JSON.parse(e.data)); } catch(err){} };
+  ws.onerror = () => { dot.className = 'dot err'; stTxt.textContent = 'chyba'; };
+  ws.onclose = () => {
+    clearInterval(ws._ping);
+    dot.className = 'dot err'; stTxt.textContent = 'odpojeno';
+    addSys('⚠️ Odpojeno – znovu za 8s…');
+    reconnT = setTimeout(openWS, 8000);
+  };
+}
+
+function handleWS({event, data}) {
+  if (!event || event === 'pusher:connection_established' || event === 'pusher:pong') return;
+  if (event === 'pusher_internal:subscription_succeeded') return;
+
+  if (event.includes('ChatMessageEvent')) {
+    let d = typeof data === 'string' ? JSON.parse(data) : data;
+    const user   = d.sender?.username || d.author?.username || 'anon';
+    const text   = d.content || d.message?.content || '';
+    const color  = d.sender?.identity?.color || null;
+    const badges = d.sender?.identity?.badges || [];
+    const emotes = d.message?.emotes || d.emotes || [];
+    const own    = loggedIn && user.toLowerCase() === myUser.toLowerCase();
+    addMsg(user, text, color, badges, emotes, own);
+  }
+
+  if (event.includes('SubscriptionEvent')) {
+    let d = typeof data === 'string' ? JSON.parse(data) : data;
+    addSys(`🎉 ${d.username||'někdo'} se přihlásil/a k odběru!`);
+  }
+  if (event.includes('StreamerIsLive')) {
+    isLive = true;
+    videoBtn.style.borderColor = 'var(--danger)'; videoBtn.style.color = 'var(--danger)';
+    addSys(`🔴 ${channel} začal/a vysílat! Stiskni 📺`);
+    vbadge.style.display = 'block';
+  }
+}
+
+// ════════════════════════════════════════════
+// SEND MESSAGE
+// ════════════════════════════════════════════
+async function sendMsg() {
+  if (!loggedIn) { toggleLogin(); return; }
+  const text = itxt.value.trim();
+  if (!text || !chatroomId || text.length > 500) return;
+  sbtn.disabled = true;
+  const tok = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+  try {
+    const r = await fetch(`https://kick.com/api/v2/messages/send/${chatroomId}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':tok,'Accept':'application/json'},
+      body: JSON.stringify({content: text, type: 'message'})
+    });
+    if (r.ok) { itxt.value = ''; itxt.style.height = 'auto'; onIC(); }
+    else { const e = await r.json().catch(()=>({})); addSys(`❌ Chyba: ${e.message||r.status}`); }
+  } catch(e) { addSys(`❌ Síťová chyba: ${e.message}`); }
+  sbtn.disabled = false;
+  itxt.focus();
+}
+
+// ════════════════════════════════════════════
+// INPUT
+// ════════════════════════════════════════════
+function onIC() {
+  const l = itxt.value.length;
+  ccEl.textContent = `${l} / 500`; ccEl.className = 'cc' + (l>450?' w':'');
+  itxt.style.height = 'auto'; itxt.style.height = Math.min(itxt.scrollHeight, 90) + 'px';
+}
+function onIK(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
+
+// ════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════
+function toggleLogin() {
+  const m = document.getElementById('loginModal');
+  if (m.classList.contains('open')) { closeLogin(); return; }
+  document.getElementById('tinput').value = authToken;
+  document.getElementById('uninput').value = myUser;
+  m.classList.add('open');
+}
+function closeLogin() { document.getElementById('loginModal').classList.remove('open'); }
+function doLogin() {
+  const t = document.getElementById('tinput').value.trim();
+  const u = document.getElementById('uninput').value.trim();
+  if (!t||!u) { alert('Vyplň obě pole!'); return; }
+  authToken=t; myUser=u; loggedIn=true;
+  localStorage.setItem('k_tok',t); localStorage.setItem('k_usr',u);
+  updateLoginUI(); closeLogin(); addSys(`👤 Přihlášen jako ${u}`);
+  followingLoaded = false; // reset so it reloads next time
+}
+function logout() {
+  authToken=''; myUser=''; loggedIn=false;
+  localStorage.removeItem('k_tok'); localStorage.removeItem('k_usr');
+  updateLoginUI(); addSys('👤 Odhlášeno');
+  followingLoaded = false;
+}
+function updateLoginUI() {
+  if (loggedIn) {
+    loginBtn.classList.add('li'); loginBtn.title = `${myUser} (klikni = odhlásit)`;
+    loginBtn.onclick = () => { if(confirm('Odhlásit se?')) logout(); };
+    itxt.disabled = false; sbtn.disabled = false;
+    lhintEl.innerHTML = `<span style="color:var(--kick)">✓ ${esc(myUser)}</span>`;
+  } else {
+    loginBtn.classList.remove('li'); loginBtn.title = 'Přihlásit se';
+    loginBtn.onclick = toggleLogin;
+    itxt.disabled = true; sbtn.disabled = true;
+    lhintEl.innerHTML = `<span class="lhint" onclick="toggleLogin()">Přihlásit se</span> pro psaní`;
+  }
+}
+
+// ════════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════════
+function toggleSearch() {
+  const open = document.getElementById('spanel').classList.toggle('open');
+  document.getElementById('searchBtn').classList.toggle('on', open);
+  if (open) setTimeout(() => document.getElementById('sinput').focus(), 60);
+}
+async function doSearch() {
+  const q = document.getElementById('sinput').value.trim();
+  if (!q) return;
+  const res = document.getElementById('sres');
+  res.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:Space Mono,monospace;padding:6px 0">Hledám…</div>';
+  let results = await searchKick(q);
+  if (!results.length) {
+    const d = await fetchChannel(q);
+    if (d) results = [{slug:d.slug,user:d.user,is_live:!!d.livestream,viewers_count:d.livestream?.viewer_count||0}];
+  }
+  res.innerHTML = '';
+  if (!results.length) {
+    res.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:Space Mono,monospace;padding:6px 0">Nic nenalezeno</div>';
+    return;
+  }
+  for (const ch of results) {
+    const slug = ch.slug||ch.username||'';
+    const name = ch.user?.username||ch.username||slug;
+    const av   = ch.user?.profile_pic||ch.profile_pic||'';
+    const live = ch.is_live||!!ch.livestream;
+    const vw   = ch.viewers_count||ch.livestream?.viewer_count||0;
+    const item = document.createElement('div'); item.className = 'sri';
+    item.innerHTML = `<img class="av" src="${esc(av)}" onerror="this.style.visibility='hidden'" alt=""><div class="sri-i"><div class="sri-n">${esc(name)}</div><div class="sri-s ${live?'clive':'coff'}">${live?`🔴 ŽIVĚ · ${vw.toLocaleString()} diváků`:'offline'}</div></div>`;
+    item.onclick = () => {
+      document.getElementById('spanel').classList.remove('open');
+      document.getElementById('searchBtn').classList.remove('on');
+      connect(slug);
+    };
+    res.appendChild(item);
+  }
+}
+
+// ════════════════════════════════════════════
+// FOLLOWING / SLEDOVANÍ
+// ════════════════════════════════════════════
+let followingOpen = false;
+let followingLoaded = false;
+
+function toggleFollowing() {
+  const panel = document.getElementById('fpanel');
+  followingOpen = !followingOpen;
+  panel.classList.toggle('open', followingOpen);
+  document.getElementById('followBtn').classList.toggle('on', followingOpen);
+  // Close others
+  if (followingOpen) {
+    document.getElementById('spanel').classList.remove('open');
+    document.getElementById('searchBtn').classList.remove('on');
+    if (!followingLoaded) loadFollowing();
+  }
+}
+
+async function loadFollowing() {
+  const flist = document.getElementById('flist');
+  if (!loggedIn) {
+    flist.innerHTML = '<div class="fpanel-msg">Přihlas se pro zobrazení sledovaných 👤</div>';
+    return;
+  }
+  flist.innerHTML = '<div class="fpanel-msg">Načítám…</div>';
+  followingLoaded = true;
+
+  const tok = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+  let channels = [];
+
+  // Kick API: GET /api/v1/channels/followed
+  try {
+    const r = await fetch('https://kick.com/api/v1/channels/followed?limit=50', {
+      headers: { 'Authorization': tok, 'Accept': 'application/json' }
+    });
+    if (r.ok) {
+      const d = await r.json();
+      channels = d.data || d.channels || d || [];
+    }
+  } catch(e) {}
+
+  // Fallback: try subscriptions endpoint
+  if (!channels.length) {
+    try {
+      const r = await fetch('https://kick.com/api/v1/subscriptions?limit=50', {
+        headers: { 'Authorization': tok, 'Accept': 'application/json' }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        channels = d.data || d || [];
+      }
+    } catch(e) {}
+  }
+
+  if (!channels.length) {
+    flist.innerHTML = '<div class="fpanel-msg">Žádní sledovaní streameři nebo API nedostupné</div>';
+    return;
+  }
+
+  // Sort: live first
+  channels.sort((a, b) => {
+    const aLive = !!(a.is_live || a.livestream || a.channel?.is_live);
+    const bLive = !!(b.is_live || b.livestream || b.channel?.is_live);
+    return bLive - aLive;
+  });
+
+  flist.innerHTML = '';
+  for (const ch of channels) {
+    const slug    = ch.slug || ch.channel?.slug || ch.username || '';
+    const name    = ch.user?.username || ch.channel?.user?.username || ch.username || slug;
+    const avatar  = ch.user?.profile_pic || ch.channel?.user?.profile_pic || ch.profile_pic || '';
+    const live    = !!(ch.is_live || ch.livestream || ch.channel?.is_live);
+    const viewers = ch.viewers_count || ch.livestream?.viewer_count || ch.channel?.livestream?.viewer_count || 0;
+    const title   = ch.livestream?.session_title || ch.channel?.livestream?.session_title || '';
+
+    const item = document.createElement('div');
+    item.className = 'fitem';
+    item.innerHTML = `
+      <div class="fitem-dot ${live ? 'live' : ''}"></div>
+      <img src="${esc(avatar)}" onerror="this.style.visibility='hidden'" alt="">
+      <div class="fitem-info">
+        <div class="fitem-name">${esc(name)}</div>
+        <div class="fitem-sub ${live ? 'fitem-live' : 'fitem-off'}">
+          ${live ? `🔴 ${viewers.toLocaleString()} diváků${title ? ' · ' + esc(title.slice(0,30)) : ''}` : 'offline'}
+        </div>
+      </div>`;
+    item.onclick = () => {
+      document.getElementById('fpanel').classList.remove('open');
+      document.getElementById('followBtn').classList.remove('on');
+      followingOpen = false;
+      connect(slug);
+    };
+    flist.appendChild(item);
+  }
+}
+
+// ════════════════════════════════════════════
+// EMOTE PICKER
+// ════════════════════════════════════════════
+let activeTab = '7tv';
+let kickNativeEmotes = {}; // name -> url, filled from channel data
+let emotePickerOpen = false;
+
+function toggleEmotePicker() {
+  const picker = document.getElementById('epicker');
+  emotePickerOpen = !emotePickerOpen;
+  picker.classList.toggle('open', emotePickerOpen);
+  document.getElementById('emoteBtn').classList.toggle('on', emotePickerOpen);
+  if (emotePickerOpen) {
+    renderEmoteGrid();
+    setTimeout(() => document.getElementById('esearch').focus(), 60);
+  }
+}
+
+function closeEmotePicker() {
+  emotePickerOpen = false;
+  document.getElementById('epicker').classList.remove('open');
+  document.getElementById('emoteBtn').classList.remove('on');
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.etab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  document.getElementById('esearch').value = '';
+  renderEmoteGrid();
+}
+
+function filterEmotes() { renderEmoteGrid(); }
+
+function renderEmoteGrid() {
+  const grid = document.getElementById('egrid');
+  const q = document.getElementById('esearch').value.toLowerCase();
+  const source = activeTab === '7tv' ? emotes7tv : kickNativeEmotes;
+  const entries = Object.entries(source).filter(([name]) => !q || name.toLowerCase().includes(q));
+
+  if (!entries.length) {
+    grid.innerHTML = `<div class="epicker-empty">${Object.keys(source).length === 0 ? 'Žádné emoty nenačteny' : 'Nic nenalezeno'}</div>`;
+    return;
+  }
+
+  // Render max 120 tiles for performance
+  grid.innerHTML = '';
+  for (const [name, url] of entries.slice(0, 120)) {
+    const tile = document.createElement('div');
+    tile.className = 'etile';
+    tile.title = name;
+    tile.innerHTML = `<img src="${esc(url)}" alt="${esc(name)}" loading="lazy" onerror="this.style.opacity='.3'"><span>${esc(name)}</span>`;
+    tile.onclick = () => insertEmote(name);
+    grid.appendChild(tile);
+  }
+  if (entries.length > 120) {
+    const more = document.createElement('div');
+    more.className = 'epicker-empty';
+    more.textContent = `+ ${entries.length - 120} dalších — hledej pro filtrování`;
+    grid.appendChild(more);
+  }
+}
+
+function insertEmote(name) {
+  const inp = document.getElementById('itxt');
+  const pos = inp.selectionStart || inp.value.length;
+  const before = inp.value.slice(0, pos);
+  const after  = inp.value.slice(pos);
+  const space  = before.length > 0 && !before.endsWith(' ') ? ' ' : '';
+  inp.value = before + space + name + ' ' + after;
+  inp.focus();
+  const newPos = pos + space.length + name.length + 1;
+  inp.setSelectionRange(newPos, newPos);
+  onIC();
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', e => {
+  if (emotePickerOpen) {
+    const picker = document.getElementById('epicker');
+    const btn = document.getElementById('emoteBtn');
+    if (!picker.contains(e.target) && e.target !== btn) closeEmotePicker();
+  }
+});
+
+// Store Kick native emotes when channel loads (called after fetchChannel)
+function storeKickEmotes(channelData) {
+  kickNativeEmotes = {};
+  const emoteList = channelData?.emotes || channelData?.channel_emotes || [];
+  for (const e of emoteList) {
+    if (e.name && (e.url || e.src)) kickNativeEmotes[e.name] = e.url || e.src;
+  }
+}
+
+// ════════════════════════════════════════════
+// SERVICE WORKER
+// ════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+updateLoginUI();
+connect('trizz_07');
+</script>
+</body>
+</html>
